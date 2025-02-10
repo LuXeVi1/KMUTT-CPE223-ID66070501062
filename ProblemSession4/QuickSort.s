@@ -1,106 +1,83 @@
-    AREA    QuickSort, CODE, READONLY
-    ENTRY
+Data    DCD     10, 12, 8, 1, 5, 7, 11, 6, 8    ; same input data
 
-    ; Define the array to be sorted
-    Data    DCD     10, 12, 8, 1, 5, 7, 11, 6, 8
-    Size    EQU     9  ; Number of elements in the array
-
-    ; Registers:
-    ; R0 = Base address of the array
-    ; R1 = Low index
-    ; R2 = High index
-    ; R3 = Pivot element
-    ; R4 = Temporary storage
-    ; R5 = Loop counter
-    ; R6 = Temporary storage
-    ; R7 = Temporary storage
-
-    ; Main function to call QuickSort
-    MOV     R0, #Data
-    MOV     R1, #0
-    MOV     R2, #Size-1
+Main    
+    LDR     r0, =Data        ; array base address
+    MOV     r1, #0          ; start index
+    MOV     r2, #8          ; end index (array length - 1)
     BL      QuickSort
-    B       EndProgram
+    B       Exit
 
+; QuickSort implementation
+; r0: array base address
+; r1: start index
+; r2: end index
 QuickSort
-    ; Save the return address
-    PUSH    {LR}
+    STMFD   sp!, {r0-r4, lr}
+    CMP     r1, r2          ; check if start >= end
+    BGE     QSortEnd
+    
+    ; Calculate pivot position
+    MOV     r3, r1          ; i = start
+    ADD     r4, r1, #1      ; j = start + 1
+    
+PartLoop
+    CMP     r4, r2          ; while j <= end
+    BGT     PlaceLoop
+    
+    ; Compare elements
+    LSL     r12, r4, #2     ; j * 4 for word alignment
+    ADD     r12, r0, r12
+    LDR     r12, [r12]      ; load arr[j]
+    
+    LSL     r11, r1, #2     ; pivot_index * 4
+    ADD     r11, r0, r11
+    LDR     r11, [r11]      ; load pivot
+    
+    CMP     r12, r11        ; compare with pivot
+    BGE     NextJ
+    
+    ; Swap elements if needed
+    ADD     r3, r3, #1      ; i++
+    
+    LSL     r12, r3, #2     ; i * 4
+    ADD     r12, r0, r12    ; address of arr[i]
+    LSL     r11, r4, #2     ; j * 4
+    ADD     r11, r0, r11    ; address of arr[j]
+    
+    LDR     r10, [r12]      ; load arr[i]
+    LDR     r9, [r11]       ; load arr[j]
+    STR     r9, [r12]       ; store in arr[i]
+    STR     r10, [r11]      ; store in arr[j]
+    
+NextJ
+    ADD     r4, r4, #1      ; j++
+    B       PartLoop
+    
+PlaceLoop
+    ; Place pivot in correct position
+    LSL     r12, r1, #2     ; pivot_index * 4
+    ADD     r12, r0, r12    ; address of pivot
+    LSL     r11, r3, #2     ; i * 4
+    ADD     r11, r0, r11    ; address of final position
+    
+    LDR     r10, [r12]      ; load pivot
+    LDR     r9, [r11]       ; load element at i
+    STR     r9, [r12]       ; store in pivot position
+    STR     r10, [r11]      ; store pivot at i
+    
+    ; Recursive calls
+    STMFD   sp!, {r1-r2}    ; save current bounds
+    SUB     r2, r3, #1      ; end = i - 1
+    BL      QuickSort       ; sort left partition
+    LDMFD   sp!, {r1-r2}    ; restore bounds
+    
+    STMFD   sp!, {r1}       ; save start
+    ADD     r1, r3, #1      ; start = i + 1
+    BL      QuickSort       ; sort right partition
+    LDMFD   sp!, {r1}       ; restore start
 
-    ; Check if low < high
-    CMP     R1, R2
-    BGE     EndQuickSort
+QSortEnd
+    LDMFD   sp!, {r0-r4, pc}
 
-    ; Partition the array and get the pivot index
-    BL      Partition
-
-    ; Save the pivot index
-    PUSH    {R2}
-
-    ; Recursively sort the left sub-array
-    SUB     R2, R2, #1
-    BL      QuickSort
-
-    ; Restore the pivot index
-    POP     {R2}
-
-    ; Recursively sort the right sub-array
-    ADD     R1, R2, #1
-    BL      QuickSort
-
-EndQuickSort
-    ; Restore the return address and return
-    POP     {LR}
-    BX      LR
-
-Partition
-    ; Save the return address
-    PUSH    {LR}
-
-    ; Load the pivot element (last element)
-    LDR     R3, [R0, R2, LSL #2]
-
-    ; Initialize the index of the smaller element
-    SUB     R4, R1, #1
-
-    ; Loop through the array
-    MOV     R5, R1
-PartitionLoop
-    CMP     R5, R2
-    BGE     EndPartitionLoop
-
-    ; If current element is smaller than or equal to pivot
-    LDR     R6, [R0, R5, LSL #2]
-    CMP     R6, R3
-    BGT     SkipSwap
-
-    ; Increment the index of the smaller element
-    ADD     R4, R4, #1
-
-    ; Swap elements
-    LDR     R7, [R0, R4, LSL #2]
-    STR     R6, [R0, R4, LSL #2]
-    STR     R7, [R0, R5, LSL #2]
-
-SkipSwap
-    ; Increment loop counter
-    ADD     R5, R5, #1
-    B       PartitionLoop
-
-EndPartitionLoop
-    ; Swap the pivot element with the element at the index of the smaller element + 1
-    ADD     R4, R4, #1
-    LDR     R6, [R0, R4, LSL #2]
-    LDR     R7, [R0, R2, LSL #2]
-    STR     R6, [R0, R2, LSL #2]
-    STR     R7, [R0, R4, LSL #2]
-
-    ; Return the pivot index
-    MOV     R2, R4
-
-    ; Restore the return address and return
-    POP     {LR}
-    BX      LR
-
-EndProgram
-    ; End of program
+Exit
     END
